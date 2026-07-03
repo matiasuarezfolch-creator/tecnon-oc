@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tecnon SRL — Gestión de Órdenes de Compra</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/tabler-icons.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!--
+  ╔══════════════════════════════════════════════════════════╗
+  ║  TECNON SRL — Gestión de Órdenes de Compra              ║
+  ║  Para configurar el guardado en Google Sheets:           ║
+  ║  1. Abrí https://script.google.com                       ║
+  ║  2. Nuevo proyecto → pegá el código del SCRIPT.gs        ║
+  ║  3. Publicar → Implementar como app web                  ║
+  ║  4. Pegá la URL del deploy en SCRIPT_URL abajo           ║
+  ╚══════════════════════════════════════════════════════════╝
+-->
+
+<style>
+:root{
+  --tecnon-blue:#0057A8;
+  --tecnon-blue-dark:#003E7A;
+  --tecnon-accent:#00A3E0;
+  --bg-base:#F0F4F8;
+  --bg-sidebar:#003E7A;
+  --bg-card:#FFFFFF;
+  --bg-input:#F5F8FA;
+  --border:#D6E4F0;
+  --text-primary:#1A2B40;
+  --text-secondary:#5A7A9A;
+  --text-muted:#8AAABB;
+  --green:#16A34A;--green-bg:#DCFCE7;--green-border:#86EFAC;
+  --yellow:#B45309;--yellow-bg:#FEF3C7;--yellow-border:#FCD34D;
+  --red:#DC2626;--red-bg:#FEE2E2;--red-border:#FCA5A5;
+  --blue-bg:#DBEAFE;--blue-border:#93C5FD;
+  --purple-bg:#F3E8FF;--purple-border:#C4B5FD;
+  --orange-bg:#FED7AA;--orange-border:#FDBA74;
+  --teal-bg:#CCFBF1;--teal-border:#5EEAD4;
+  --shadow:0 1px 3px rgba(0,87,168,0.08),0 1px 2px rgba(0,87,168,0.04);
+  --shadow-md:0 4px 12px rgba(0,87,168,0.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg-base);color:var(--text-primary);min-height:100vh;display:flex;font-size:14px}
+
+/* ── SIDEBAR ── */
+#sidebar{width:230px;min-width:230px;background:var(--bg-sidebar);display:flex;flex-direction:column;position:fixed;top:0;left:0;height:100vh;z-index:100;box-shadow:2px 0 12px rgba(0,0,0,0.15)}
+.sb-logo{padding:22px 20px 18px;border-bottom:1px solid rgba(255,255,255,0.12);display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.sb-logo-img{height:36px;width:auto;filter:brightness(0) invert(1)}
+.sb-logo-text{font-size:18px;font-weight:700;color:#fff;letter-spacing:1px;display:none}
+.sb-logo-sub{font-size:10px;font-weight:500;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px}
+.sb-section{padding:14px 0 4px;font-size:10px;font-weight:600;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;padding-left:20px}
+.sb-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;color:rgba(255,255,255,0.65);font-size:13px;transition:all 0.15s;border-left:3px solid transparent;margin:1px 0}
+.sb-item:hover{color:#fff;background:rgba(255,255,255,0.08)}
+.sb-item.active{color:#fff;background:rgba(255,255,255,0.14);border-left-color:var(--tecnon-accent)}
+.sb-item i{font-size:17px;width:18px}
+.sb-sync{padding:8px 20px;font-size:11px;color:rgba(255,255,255,0.4);display:flex;align-items:center;gap:6px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.25);flex-shrink:0}
+.sync-dot.ok{background:#34D399}
+.sync-dot.saving{background:#FBBF24;animation:pulse 1s infinite}
+.sync-dot.error{background:#F87171}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.sb-bottom{margin-top:auto;padding:14px 16px 20px;border-top:1px solid rgba(255,255,255,0.1)}
+.role-badge{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px}
+.role-dot{width:8px;height:8px;border-radius:50%;background:var(--tecnon-accent);flex-shrink:0}
+.role-name{font-size:12px;font-weight:600;color:#fff}
+.role-label{font-size:11px;color:rgba(255,255,255,0.45)}
+
+/* ── MAIN ── */
+#main{margin-left:230px;flex:1;min-height:100vh;display:flex;flex-direction:column}
+#topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 28px;height:58px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
+.topbar-title{font-size:16px;font-weight:600;color:var(--text-primary)}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.role-switch{display:flex;background:var(--bg-input);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.role-btn{padding:6px 14px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);transition:all 0.15s}
+.role-btn.active{background:var(--tecnon-blue);color:#fff}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;box-shadow:var(--shadow)}
+.btn-primary{background:var(--tecnon-blue);color:#fff}.btn-primary:hover{background:var(--tecnon-blue-dark)}
+.btn-ghost{background:#fff;color:var(--text-secondary);border:1px solid var(--border)}.btn-ghost:hover{background:var(--bg-input)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#15803D}
+.btn-danger{background:#DC2626;color:#fff}.btn-danger:hover{background:#B91C1C}
+.btn-warning{background:#D97706;color:#fff}.btn-warning:hover{background:#B45309}
+
+#content{flex:1;padding:26px 30px;overflow-y:auto}
+
+/* ── SETUP BANNER ── */
+#setup-banner{background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:flex-start;gap:14px}
+#setup-banner i{color:#C2410C;font-size:22px;flex-shrink:0;margin-top:2px}
+.setup-title{font-size:14px;font-weight:600;color:#C2410C;margin-bottom:4px}
+.setup-desc{font-size:12px;color:#92400E;line-height:1.5}
+.setup-input-row{display:flex;gap:8px;margin-top:10px}
+.setup-input{background:#fff;border:1px solid #FCD34D;border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text-primary);outline:none;flex:1;font-family:'Inter',sans-serif}
+.setup-input:focus{border-color:#D97706}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px 22px;position:relative;overflow:hidden;box-shadow:var(--shadow)}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card.blue::before{background:var(--tecnon-blue)}
+.stat-card.red::before{background:#DC2626}
+.stat-card.amber::before{background:#D97706}
+.stat-card.green::before{background:var(--green)}
+.stat-label{font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.stat-value{font-size:30px;font-weight:700;color:var(--text-primary);line-height:1}
+.stat-sub{font-size:11px;color:var(--text-muted);margin-top:4px}
+.stat-icon{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:34px;opacity:0.06;color:var(--tecnon-blue)}
+
+/* ── CHARTS ── */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.chart-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:22px;box-shadow:var(--shadow)}
+.chart-title{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:16px}
+.chart-wrap{position:relative;height:180px}
+
+/* ── TABLE ── */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-size:15px;font-weight:600;color:var(--text-primary)}
+.filters-row{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filter-input{background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text-primary);outline:none;min-width:160px;transition:border-color 0.15s}
+.filter-input:focus{border-color:var(--tecnon-blue)}
+.filter-input::placeholder{color:var(--text-muted)}
+select.filter-input{cursor:pointer}
+.table-wrap{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse}
+thead th{padding:11px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);background:var(--bg-input);white-space:nowrap}
+tbody tr{border-bottom:1px solid #F0F4F8;transition:background 0.1s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:#F5F9FF}
+td{padding:11px 14px;font-size:13px;color:var(--text-secondary);vertical-align:middle}
+.td-primary{color:var(--text-primary);font-weight:500}
+.row-alert-red{background:#FFF5F5!important}
+.row-alert-yellow{background:#FFFBEB!important}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;white-space:nowrap}
+.badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.b-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}.b-green .badge-dot{background:var(--green)}
+.b-yellow{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border)}.b-yellow .badge-dot{background:var(--yellow)}
+.b-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}.b-red .badge-dot{background:var(--red)}
+.b-blue{background:var(--blue-bg);color:var(--tecnon-blue);border:1px solid var(--blue-border)}.b-blue .badge-dot{background:var(--tecnon-blue)}
+.b-gray{background:#F1F5F9;color:#64748B;border:1px solid #CBD5E1}.b-gray .badge-dot{background:#64748B}
+.b-purple{background:var(--purple-bg);color:#7C3AED;border:1px solid var(--purple-border)}.b-purple .badge-dot{background:#7C3AED}
+.b-orange{background:var(--orange-bg);color:#C2410C;border:1px solid var(--orange-border)}.b-orange .badge-dot{background:#C2410C}
+.b-teal{background:var(--teal-bg);color:#0F766E;border:1px solid var(--teal-border)}.b-teal .badge-dot{background:#0F766E}
+.prio-high{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.prio-med{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.prio-low{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+
+/* ── ALERT STRIP ── */
+.alert-strip{background:#FFF7ED;border:1px solid #FED7AA;border-radius:10px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+.alert-strip i{color:#C2410C;font-size:18px;flex-shrink:0}
+.alert-strip-text{font-size:13px;color:#C2410C;font-weight:500}
+
+/* ── MODAL ── */
+#modal-overlay{position:fixed;inset:0;background:rgba(0,30,60,0.45);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(2px)}
+#modal-overlay.open{display:flex}
+#modal{background:#fff;border:1px solid var(--border);border-radius:16px;width:100%;max-width:720px;padding:30px;box-shadow:var(--shadow-md)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.modal-title{font-size:17px;font-weight:600;color:var(--text-primary)}
+.modal-close{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:20px;padding:4px;border-radius:8px;transition:all 0.15s}
+.modal-close:hover{color:var(--text-primary);background:var(--bg-input)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+label{font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px}
+input,select,textarea{background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;color:var(--text-primary);outline:none;font-family:'Inter',sans-serif;transition:border-color 0.15s}
+input:focus,select:focus,textarea:focus{border-color:var(--tecnon-blue);background:#fff}
+input:disabled{opacity:0.5;cursor:not-allowed}
+textarea{resize:vertical;min-height:70px;max-height:140px}
+.form-section{grid-column:1/-1;font-size:11px;font-weight:700;color:var(--tecnon-blue);text-transform:uppercase;letter-spacing:1px;padding-top:10px;padding-bottom:4px;border-top:1px solid var(--border);margin-top:4px}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.hint{font-size:11px;color:var(--text-muted);margin-top:2px}
+
+/* ── DETAIL PANEL ── */
+#detail-panel{position:fixed;right:0;top:0;width:420px;height:100vh;background:#fff;border-left:1px solid var(--border);z-index:150;transform:translateX(100%);transition:transform 0.25s ease;overflow-y:auto;padding:26px;box-shadow:-4px 0 20px rgba(0,0,0,0.08)}
+#detail-panel.open{transform:translateX(0)}
+.detail-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)}
+.detail-section{margin-bottom:20px}
+.detail-section-title{font-size:11px;font-weight:700;color:var(--tecnon-blue);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.detail-row{display:flex;justify-content:space-between;align-items:flex-start;padding:7px 0;border-bottom:1px solid #F8FAFC}
+.detail-row:last-child{border-bottom:none}
+.detail-key{font-size:12px;color:var(--text-muted);min-width:130px}
+.detail-val{font-size:12px;color:var(--text-primary);font-weight:500;text-align:right;word-break:break-word;max-width:220px}
+.obs-item{background:var(--bg-input);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px;color:var(--text-primary);line-height:1.5;border-left:3px solid var(--tecnon-blue)}
+.attach-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-input);border-radius:8px;margin-bottom:6px}
+.attach-icon{font-size:18px;color:var(--tecnon-blue)}
+.attach-name{font-size:12px;color:var(--text-primary)}
+.attach-type{font-size:11px;color:var(--text-muted);margin-left:auto}
+
+/* ── SUPPLIERS ── */
+.prov-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:4px}
+.prov-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow)}
+.prov-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.prov-card-name{font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.3}
+.prov-card-prods{font-size:11px;color:var(--text-muted);margin-top:2px}
+.prov-info-row{display:flex;align-items:flex-start;gap:8px;font-size:12px}
+.prov-info-row i{font-size:15px;color:var(--text-muted);flex-shrink:0;margin-top:1px}
+.prov-info-val{color:var(--text-primary);line-height:1.4}
+.prov-info-empty{color:var(--text-muted);font-style:italic}
+.prov-edit-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--text-secondary);padding:4px 10px;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all 0.15s;flex-shrink:0}
+.prov-edit-btn:hover{background:var(--blue-bg);color:var(--tecnon-blue);border-color:var(--blue-border)}
+
+/* ── RETIRO PANEL ── */
+#retiro-panel{position:fixed;right:0;top:0;width:460px;height:100vh;background:#fff;border-left:1px solid var(--border);z-index:150;transform:translateX(100%);transition:transform 0.25s ease;display:flex;flex-direction:column;box-shadow:-4px 0 20px rgba(0,0,0,0.08)}
+#retiro-panel.open{transform:translateX(0)}
+.retiro-header{padding:22px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.retiro-body{flex:1;overflow-y:auto;padding:20px 24px}
+.retiro-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center}
+.retiro-preview{background:var(--bg-input);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:12px;color:var(--text-primary);line-height:1.8;white-space:pre-wrap;font-family:'Inter',monospace;min-height:200px}
+.copy-success{display:none;align-items:center;gap:6px;font-size:12px;color:var(--green);padding:6px 12px;background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px}
+.copy-success.show{display:flex}
+
+/* ── PROV MODAL ── */
+#prov-modal-overlay{position:fixed;inset:0;background:rgba(0,30,60,0.45);z-index:300;display:none;align-items:center;justify-content:center;padding:40px 20px;backdrop-filter:blur(2px)}
+#prov-modal-overlay.open{display:flex}
+#prov-modal{background:#fff;border:1px solid var(--border);border-radius:16px;width:100%;max-width:500px;padding:30px;box-shadow:var(--shadow-md)}
+
+/* ── LOADING ── */
+#loading-screen{position:fixed;inset:0;background:var(--bg-sidebar);z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.loading-logo{height:48px;filter:brightness(0) invert(1)}
+.loading-spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{font-size:13px;color:rgba(255,255,255,0.5)}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg-base)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.empty{text-align:center;padding:48px 20px;color:var(--text-muted)}
+.empty i{font-size:40px;margin-bottom:12px;display:block;opacity:0.4}
+.readonly-tip{display:none;background:var(--green-bg);border:1px solid var(--green-border);border-radius:8px;padding:8px 14px;margin-bottom:14px;font-size:12px;color:var(--green);align-items:center;gap:8px}
+.readonly-tip.show{display:flex}
+</style>
+</head>
+<body>
+
+<div id="loading-screen">
+  <img class="loading-logo" src="https://www.tecnon.com.ar/wp-content/uploads/2025/09/logo-tecnon-2025-02.svg"
+       alt="Tecnon SRL"
+       onerror="this.style.display='none';document.getElementById('loading-text-logo').style.display='block'">
+  <div id="loading-text-logo" style="display:none;font-size:22px;font-weight:700;color:#fff;letter-spacing:2px">TECNON SRL</div>
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-msg">Cargando datos...</div>
+</div>
+
+<nav id="sidebar">
+  <div class="sb-logo">
+    <img class="sb-logo-img"
+         src="https://www.tecnon.com.ar/wp-content/uploads/2025/09/logo-tecnon-2025-02.svg"
+         alt="Tecnon SRL"
+         onerror="this.style.display='none';document.getElementById('sb-logo-fallback').style.display='block'">
+    <span id="sb-logo-fallback" style="display:none;font-size:16px;font-weight:700;color:#fff;letter-spacing:1px">TECNON SRL</span>
+    <span class="sb-logo-sub">Gestión de Compras</span>
+  </div>
+  <div class="sb-section">Navegación</div>
+  <div class="sb-item active" onclick="showView('dashboard')" id="nav-dashboard"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
+  <div class="sb-item" onclick="showView('orders')" id="nav-orders"><i class="ti ti-file-text"></i> Órdenes de compra</div>
+  <div class="sb-item" onclick="showView('suppliers')" id="nav-suppliers"><i class="ti ti-building-store"></i> Proveedores</div>
+  <div class="sb-sync"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Iniciando...</span></div>
+  <div class="sb-bottom">
+    <div class="role-badge">
+      <div class="role-dot" id="role-dot"></div>
+      <div><div class="role-name" id="role-name">Gestor de Compras</div><div class="role-label" id="role-label">Acceso completo</div></div>
+    </div>
+  </div>
+</nav>
+
+<div id="main">
+<div id="topbar">
+  <div class="topbar-title" id="topbar-title">Dashboard</div>
+  <div class="topbar-right">
+    <div class="role-switch">
+      <button class="role-btn active" onclick="setRole('gestor')" id="rb-gestor">Gestor de Compras</button>
+      <button class="role-btn" onclick="setRole('jefe')" id="rb-jefe">Jefe de Planta</button>
+    </div>
+    <button class="btn btn-green" id="btn-retiro" onclick="openRetiroPanel()" style="display:none"><i class="ti ti-list-check"></i> Lista de retiros</button>
+    <button class="btn btn-primary" id="btn-new-order" onclick="openModal()"><i class="ti ti-plus"></i> Nueva orden</button>
+  </div>
+</div>
+
+<div id="content">
+
+<!-- DASHBOARD -->
+<div id="view-dashboard">
+  <div id="setup-banner">
+    <i class="ti ti-settings"></i>
+    <div style="flex:1">
+      <div class="setup-title">Configuración inicial — Google Sheets</div>
+      <div class="setup-desc">
+        Para que los datos se guarden y sean visibles para todos, pegá la URL de tu Google Apps Script acá abajo.<br>
+        <strong>¿No lo configuraste todavía?</strong> Abrí el archivo <code>INSTRUCCIONES.txt</code> que viene junto a este HTML.
+      </div>
+      <div class="setup-input-row">
+        <input class="setup-input" type="text" id="script-url-input" placeholder="https://script.google.com/macros/s/TU_SCRIPT_ID/exec">
+        <button class="btn btn-warning" onclick="saveScriptUrl()"><i class="ti ti-check"></i> Guardar URL</button>
+      </div>
+    </div>
+    <button onclick="document.getElementById('setup-banner').style.display='none'" style="background:none;border:none;color:#C2410C;cursor:pointer;font-size:18px;flex-shrink:0"><i class="ti ti-x"></i></button>
+  </div>
+
+  <div id="alert-banner" class="alert-strip" style="display:none"><i class="ti ti-alert-triangle"></i><div class="alert-strip-text"><strong id="alert-text"></strong></div></div>
+  <div class="stat-grid">
+    <div class="stat-card blue"><div class="stat-label">Órdenes abiertas</div><div class="stat-value" id="s-open">0</div><div class="stat-sub">activas en sistema</div><i class="ti ti-package stat-icon"></i></div>
+    <div class="stat-card red"><div class="stat-label">Atrasadas</div><div class="stat-value" id="s-late">0</div><div class="stat-sub">requieren atención</div><i class="ti ti-alert-circle stat-icon"></i></div>
+    <div class="stat-card amber"><div class="stat-label">Llegan hoy</div><div class="stat-value" id="s-today">0</div><div class="stat-sub">fecha estimada hoy</div><i class="ti ti-calendar-event stat-icon"></i></div>
+    <div class="stat-card green"><div class="stat-label">Esta semana</div><div class="stat-value" id="s-week">0</div><div class="stat-sub">próximas entregas</div><i class="ti ti-calendar-week stat-icon"></i></div>
+  </div>
+  <div class="charts-row">
+    <div class="chart-card"><div class="chart-title">Órdenes por estado</div><div class="chart-wrap"><canvas id="chartEstado"></canvas></div></div>
+    <div class="chart-card"><div class="chart-title">Órdenes por proveedor</div><div class="chart-wrap"><canvas id="chartProv"></canvas></div></div>
+  </div>
+  <div class="section-header"><div class="section-title">Próximas entregas (7 días)</div></div>
+  <div class="table-wrap"><table><thead><tr><th>Proveedor</th><th>Producto</th><th>Cant.</th><th>Fecha est.</th><th>Estado</th><th>Prioridad</th><th>Alerta</th></tr></thead><tbody id="tb-upcoming"></tbody></table></div>
+</div>
+
+<!-- ORDERS -->
+<div id="view-orders" style="display:none">
+  <div class="readonly-tip" id="readonly-tip"><i class="ti ti-eye"></i> Modo lectura — Jefe de Planta. Solo visualización.</div>
+  <div class="section-header"><div class="section-title">Todas las órdenes de compra</div></div>
+  <div class="filters-row">
+    <input class="filter-input" type="text" id="f-prov" placeholder="Buscar proveedor..." oninput="applyFilters()">
+    <input class="filter-input" type="text" id="f-prod" placeholder="Buscar producto..." oninput="applyFilters()">
+    <select class="filter-input" id="f-estado" onchange="applyFilters()">
+      <option value="">Todos los estados</option>
+      <option>Esperando cotización</option><option>Por pagar</option><option>Pagado</option>
+      <option>Esperando entrega</option><option>Retirar</option><option>Recibido</option><option>Cancelada</option>
+    </select>
+    <select class="filter-input" id="f-prio" onchange="applyFilters()">
+      <option value="">Todas las prioridades</option><option>Alta</option><option>Media</option><option>Baja</option>
+    </select>
+    <input class="filter-input" type="date" id="f-fecha" onchange="applyFilters()">
+    <button class="btn btn-ghost" onclick="clearFilters()"><i class="ti ti-x"></i> Limpiar</button>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>Proveedor</th><th>Producto</th><th>Cant.</th><th>Emisión</th><th>F. Prometida</th><th>F. Estimada</th><th>Estado</th><th>Prioridad</th><th>Alerta</th><th></th></tr></thead><tbody id="tb-orders"></tbody></table></div>
+</div>
+
+<!-- SUPPLIERS -->
+<div id="view-suppliers" style="display:none">
+  <div class="section-header"><div class="section-title">Proveedores</div><span style="font-size:12px;color:var(--text-muted)">Cargá dirección y horario para la lista de retiros</span></div>
+  <div class="prov-grid" id="prov-grid"></div>
+</div>
+
+</div>
+</div>
+
+<!-- MODAL ORDEN -->
+<div id="modal-overlay" onclick="closeModalOutside(event)">
+<div id="modal">
+  <div class="modal-header"><div class="modal-title" id="modal-title">Nueva orden de compra</div><button class="modal-close" onclick="closeModal()"><i class="ti ti-x"></i></button></div>
+  <div class="form-grid">
+    <div class="form-section">Datos básicos</div>
+    <div class="form-group"><label>Proveedor *</label><select id="f-supplier" onchange="onSupplierChange()"><option value="">Seleccionar proveedor...</option></select></div>
+    <div class="form-group"><label>Contacto proveedor</label><input id="f-contact" type="text" placeholder="Nombre / email / teléfono"></div>
+    <div class="form-group"><label>Fecha de emisión *</label><input id="f-issue-date" type="date"></div>
+    <div class="form-group"><label>Prioridad</label><select id="f-priority"><option>Alta</option><option selected>Media</option><option>Baja</option></select></div>
+    <div class="form-section">Información del producto</div>
+    <div class="form-group full"><label>Producto *</label><select id="f-product" disabled><option value="">Primero elegí un proveedor...</option></select><div class="hint" id="product-hint"></div></div>
+    <div class="form-group"><label>Cantidad solicitada *</label><input id="f-qty" type="number" placeholder="Ej: 500"></div>
+    <div class="form-group"><label>Unidad de medida</label><select id="f-unit"><option>kg</option><option>litros</option><option>unidades</option><option>metros</option><option>toneladas</option><option>cajas</option><option>pallets</option></select></div>
+    <div class="form-section">Estado y fechas</div>
+    <div class="form-group full"><label>Estado de recepción</label><select id="f-status"><option>Esperando cotización</option><option>Por pagar</option><option>Pagado</option><option>Esperando entrega</option><option>Retirar</option><option>Recibido</option><option>Cancelada</option></select></div>
+    <div class="form-group"><label>Fecha prometida proveedor</label><input id="f-promised" type="date"></div>
+    <div class="form-group"><label>Fecha estimada llegada</label><input id="f-estimated" type="date"></div>
+    <div class="form-group"><label>Fecha real de recepción</label><input id="f-received" type="date"></div>
+    <div class="form-group"><label>Material crítico</label><select id="f-critical"><option value="0">No</option><option value="1">Sí</option></select></div>
+    <div class="form-section">Observaciones</div>
+    <div class="form-group full"><label>Comentarios del comprador</label><textarea id="f-obs-buyer" placeholder="Detalles, acuerdos especiales, etc."></textarea></div>
+    <div class="form-group"><label>Motivo de atraso</label><input id="f-obs-delay" type="text" placeholder="Si aplica"></div>
+    <div class="form-group"><label>Problemas con el proveedor</label><input id="f-obs-problem" type="text" placeholder="Si aplica"></div>
+    <div class="form-group full"><label>Notas para producción</label><textarea id="f-obs-prod" style="min-height:60px" placeholder="Instrucciones especiales para producción"></textarea></div>
+    <div class="form-section">Archivos adjuntos (referencia)</div>
+    <div class="form-group full" style="gap:8px"><label>Marcar adjuntos</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-ghost" onclick="addAttach('Orden de compra.pdf','PDF')"><i class="ti ti-file-description"></i> OC PDF</button>
+        <button type="button" class="btn btn-ghost" onclick="addAttach('Factura.pdf','PDF')"><i class="ti ti-receipt"></i> Factura</button>
+        <button type="button" class="btn btn-ghost" onclick="addAttach('Remito.pdf','PDF')"><i class="ti ti-notes"></i> Remito</button>
+        <button type="button" class="btn btn-ghost" onclick="addAttach('Presupuesto.pdf','PDF')"><i class="ti ti-report-money"></i> Presupuesto</button>
+        <button type="button" class="btn btn-ghost" onclick="addAttach('Foto mercadería.jpg','IMG')"><i class="ti ti-camera"></i> Foto</button>
+      </div>
+      <div id="attach-preview" style="margin-top:6px"></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-danger" id="btn-delete" onclick="deleteOrder()" style="display:none;margin-right:auto"><i class="ti ti-trash"></i> Eliminar</button>
+    <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+    <button class="btn btn-primary" onclick="saveOrder()"><i class="ti ti-check"></i> Guardar orden</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL PROVEEDOR -->
+<div id="prov-modal-overlay" onclick="closeProvModalOutside(event)">
+<div id="prov-modal">
+  <div class="modal-header"><div class="modal-title">Editar proveedor</div><button class="modal-close" onclick="closeProvModal()"><i class="ti ti-x"></i></button></div>
+  <div class="form-grid">
+    <div class="form-group full"><label>Proveedor</label><input id="pm-name" type="text" disabled style="opacity:0.6"></div>
+    <div class="form-group full"><label>Dirección</label><input id="pm-address" type="text" placeholder="Ej: Av. San Martín 1234, Rosario"></div>
+    <div class="form-group full"><label>Horario de retiro</label><input id="pm-hours" type="text" placeholder="Ej: Lunes a viernes 8:00 a 17:00"></div>
+    <div class="form-group full"><label>Contacto / teléfono</label><input id="pm-contact" type="text" placeholder="Ej: Juan Pérez — 011-4444-1234"></div>
+    <div class="form-group full"><label>Observaciones</label><textarea id="pm-obs" placeholder="Instrucciones especiales" style="min-height:60px"></textarea></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-ghost" onclick="closeProvModal()">Cancelar</button><button class="btn btn-primary" onclick="saveProvData()"><i class="ti ti-check"></i> Guardar</button></div>
+</div>
+</div>
+
+<!-- DETAIL PANEL -->
+<div id="detail-panel">
+  <div class="detail-header">
+    <div><div style="font-size:15px;font-weight:600;color:var(--text-primary)" id="dp-title"></div><div style="font-size:12px;color:var(--text-muted);margin-top:2px" id="dp-code"></div></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-ghost" id="dp-edit-btn" onclick="editFromPanel()" style="font-size:12px;padding:5px 10px"><i class="ti ti-edit"></i> Editar</button>
+      <button class="modal-close" onclick="closePanel()"><i class="ti ti-x"></i></button>
+    </div>
+  </div>
+  <div id="dp-content"></div>
+</div>
+
+<!-- PANEL RETIROS -->
+<div id="retiro-panel">
+  <div class="retiro-header"><div><div style="font-size:15px;font-weight:600;color:var(--text-primary)">Lista de retiros</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Todas las órdenes activas</div></div><button class="modal-close" onclick="closeRetiroPanel()"><i class="ti ti-x"></i></button></div>
+  <div class="retiro-body"><div id="retiro-empty" style="display:none" class="empty"><i class="ti ti-package-off"></i>No hay órdenes activas</div><div class="retiro-preview" id="retiro-text"></div></div>
+  <div class="retiro-footer"><button class="btn btn-primary" onclick="copyRetiro()" style="flex:1"><i class="ti ti-copy"></i> Copiar para WhatsApp / mail</button><div class="copy-success" id="copy-ok"><i class="ti ti-check"></i> ¡Copiado!</div></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURACIÓN — pegá la URL de tu Apps Script acá
+// ═══════════════════════════════════════════════════════════
+let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby253Tkiq0IeV250f80vMpg8bYPmmi2czNmOkhLLFazn8fk3E6G1hlkqcZZQEqLfKH6/exec';
+
+function saveScriptUrl(){
+  const url = document.getElementById('script-url-input').value.trim();
+  if(!url){ alert('Pegá la URL del script primero'); return; }
+  SCRIPT_URL = url;
+  localStorage.setItem('tecnon_script_url', url);
+  document.getElementById('setup-banner').style.display='none';
+  setSyncStatus('saving','Conectando...');
+  loadFromSheets();
+}
+
+// Si ya tiene URL guardada, ocultar el banner
+if(SCRIPT_URL){
+  document.addEventListener('DOMContentLoaded',()=>{
+    const b=document.getElementById('setup-banner');
+    if(b) b.style.display='none';
+    document.getElementById('script-url-input').value=SCRIPT_URL;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CATÁLOGO DE PROVEEDORES Y PRODUCTOS
+// ═══════════════════════════════════════════════════════════
+const RAW_CATALOG = [{"name":"ARCOLOR SOCIEDAD ANONIMA COMERCIAL INDUSTRIAL INMOBILIARIA F","products":[{"desc":"clarificante"}]},{"name":"ARGENPACK CORRUGADOS S A","products":[{"desc":"Caja 500x400x400 P/ Tubos"},{"desc":"Caja 570x435x350 P/ Tubos"}]},{"name":"ATLAS PLASTICOS S R L","products":[{"desc":"Pipeta p/Eritrosedimentacion"}]},{"name":"Alta Plastica SA","products":[{"desc":"Copolímero random"}]},{"name":"BACCARO DEBORA LIA","products":[{"desc":"Filtro Separador Alternativo simil"},{"desc":"Filtro de Aceite Alternativo simil"},{"desc":"Filtros de Aire Alternativo simil"}]},{"name":"BERMA S R L","products":[{"desc":"Master Celeste"},{"desc":"Master Lila"},{"desc":"Master Verde"}]},{"name":"BLOMPER SA","products":[{"desc":"Make up"},{"desc":"Make up para Hitachi"},{"desc":"SOLUCION DE LIMPIEZA PARA CABEZALES"},{"desc":"TINTA NEGRA MONOBLOCK 11"},{"desc":"TINTA NEGRA PARA EQUIPO HITACHI MONO 16"}]},{"name":"BLUE SOLUTION S.R.L.","products":[{"desc":"0,8mm x OD 4,8mm x 1.6mm"},{"desc":"MANGUERA 1.6X4.8X1.6"}]},{"name":"EDUARDO J BACIGALUPO SA","products":[{"desc":"Cinta de embalar 72mm x 100mt"}]},{"name":"FABRIQUIMICA S.A.U.","products":[{"desc":"Fabrisil V25"},{"desc":"Gel separador nuevo"},{"desc":"VEHITUBO"}]},{"name":"GRUPO VLANTE S. R. L.","products":[{"desc":"PUMA HYDRAULIC AW ISO 68 T.205"}]},{"name":"INDUSTRIAS PUGLIESE S A","products":[{"desc":"Filtro 2.75x7.6 mm"}]},{"name":"MONES RUIZ HERNAN GUSTAVO","products":[{"desc":"Bobinas virgen 40cm x 35mc x 13Kg"},{"desc":"Bolsa 54x70 de 45 mic"},{"desc":"Bolsas de polietileno virgen 68cm x 105cm x 40mc"}]},{"name":"PANDULLI HECTOR DANIEL","products":[{"desc":"Polipropileno biorientado 25"}]},{"name":"PLASWAG S.A.","products":[{"desc":"COM PEST Cristal U249 G.19"},{"desc":"Copolímero random"},{"desc":"Poliestireno Grado HF555"},{"desc":"Polietileno IF33"}]},{"name":"POLIEX S A","products":[{"desc":"Grad. p/50 T de 12 o 13mm Telg"},{"desc":"Pallet Telg"}]},{"name":"QUIMAX S.A.","products":[{"desc":"AEROSOL LIS"},{"desc":"CITRISEND STD GEL"},{"desc":"EF CITRICO"},{"desc":"EFTA AP 425"},{"desc":"GERMATRON"},{"desc":"S-30 OIL"},{"desc":"SKIN SEND PASTA FRUTILLA"}]},{"name":"SIMKO SOCIEDAD ANONIMA","products":[{"desc":"KARIPRENE E-60225/1-TPE-E-I"}]},{"name":"SISTEMAS ANALITICOS S. A.","products":[{"desc":"Agua Destilada"},{"desc":"Anticoagulante Edta 3K"},{"desc":"Sodio citrato 2-H2O"}]},{"name":"SYNTEX SOCIEDAD ANONIMA","products":[{"desc":"HEPARINA"}]},{"name":"TODOPLASTIC DE HECTOR HALABE Y OTROS","products":[{"desc":"bolsa ziploc 25x35"}]},{"name":"VIP LABEL SRL","products":[{"desc":"Etiq. 40x20 - Acelerador - 1,5ml"},{"desc":"Etiq. 40x20 - Acelerador - 3,5 ml"},{"desc":"Etiq. 40x20 - Etiq Citrato 2.5 ml Celeste Tecnon"},{"desc":"Etiq. 40x20 - Etiq EDTA 3k 0,5 ml Lila Tecnon"},{"desc":"Etiq. 40x20 - Etiq. EDTA 3K 1.3 ML"},{"desc":"Etiq. 40x20 - Etiq. EDTA 3K 2,5 ML"},{"desc":"Etiq. 40x20 - Etiq. GEL Amarillo Tecnon"},{"desc":"Etiq. 40x20 - Granulos 10 ml"},{"desc":"Etiq. 40x20 - Granulos y Acelerador 3.5 ML"},{"desc":"Etiq. 40x20 - Heparina de Litio 1 ML"},{"desc":"Etiq. 40x20 - Heparina de Litio 2.5 ML"},{"desc":"Etiq. 40x20 - Suero Generico"},{"desc":"Etiqueta 80x60 mm"},{"desc":"Tubo 13x75 c/EDTA 2K p/2,5ml"},{"desc":"Tubo 13x75 c/EDTA 3K p/1,3ml"},{"desc":"Tubo 13x75 c/EDTA 3K p/2,5ml"}]}];
+
+const CATALOG = RAW_CATALOG.map(p=>({...p, address:'', hours:'', contact:'', obs:''}));
+// Cargar datos de proveedores desde localStorage
+const savedSuppliers = JSON.parse(localStorage.getItem('tecnon_suppliers')||'[]');
+savedSuppliers.forEach(s=>{ const c=CATALOG.find(x=>x.name===s.name); if(c){c.address=s.address||'';c.hours=s.hours||'';c.contact=s.contact||'';c.obs=s.obs||'';} });
+
+// ═══════════════════════════════════════════════════════════
+//  ESTADO
+// ═══════════════════════════════════════════════════════════
+let orders=[], currentRole='gestor', editingId=null, panelOrderId=null;
+let tempAttachments=[], filteredOrders=[], chartEstado=null, chartProv=null;
+let editingProvName=null, saveTimer=null;
+
+const today = new Date();
+const fmt = d => d.toISOString().split('T')[0];
+
+// ═══════════════════════════════════════════════════════════
+//  SYNC — Google Apps Script
+// ═══════════════════════════════════════════════════════════
+function setSyncStatus(s,msg){
+  const dot=document.getElementById('sync-dot');
+  const lbl=document.getElementById('sync-label');
+  dot.className='sync-dot '+(s==='ok'?'ok':s==='saving'?'saving':'error');
+  lbl.textContent=msg;
+}
+
+async function loadFromSheets(){
+  if(!SCRIPT_URL){ setSyncStatus('error','Sin configurar'); orders=[]; filteredOrders=[]; renderAll(); return; }
+  setSyncStatus('saving','Cargando...');
+  try{
+    const res = await fetch(SCRIPT_URL+'?action=getOrders');
+    const data = await res.json();
+    if(data.orders) orders = data.orders;
+    else orders = [];
+    filteredOrders = [...orders];
+    setSyncStatus('ok','Sincronizado');
+  } catch(e){
+    // CORS fallback: usar JSONP
+    loadViaJsonp();
+    return;
+  }
+  renderAll();
+}
+
+function loadViaJsonp(){
+  window._jsonpCallback = function(data){
+    if(data.orders) orders = data.orders;
+    else orders = [];
+    filteredOrders = [...orders];
+    setSyncStatus('ok','Sincronizado');
+    renderAll();
+    delete window._jsonpCallback;
+  };
+  const script = document.createElement('script');
+  script.src = SCRIPT_URL + '?action=getOrders&callback=_jsonpCallback';
+  script.onerror = function(){
+    setSyncStatus('error','Sin conexión');
+    orders = JSON.parse(localStorage.getItem('tecnon_orders_local')||'[]');
+    filteredOrders = [...orders];
+    renderAll();
+  };
+  document.head.appendChild(script);
+}
+
+async function saveToSheets(action, payload){
+  setSyncStatus('saving','Guardando...');
+  localStorage.setItem('tecnon_orders_local', JSON.stringify(orders));
+  if(!SCRIPT_URL){ setSyncStatus('error','Sin configurar'); return; }
+  try{
+    // Usar no-cors para POST (no podemos leer respuesta pero sí guarda)
+    await fetch(SCRIPT_URL, {
+      method:'POST',
+      mode:'no-cors',
+      body: JSON.stringify({action, ...payload}),
+      headers:{'Content-Type':'text/plain'}
+    });
+    setSyncStatus('ok','Guardado ✓');
+  } catch(e){ setSyncStatus('error','Error al guardar'); }
+}
+
+function debounceSave(fn){ clearTimeout(saveTimer); saveTimer=setTimeout(fn,500); }
+
+function renderAll(){ renderDashboard(); renderOrdersTable(); }
+
+// ═══════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════
+function parseDate(s){if(!s)return null;const p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function daysDiff(s){const d=parseDate(s);if(!d)return null;const t=new Date(today.getFullYear(),today.getMonth(),today.getDate());return Math.floor((d-t)/(1000*60*60*24));}
+function alertLevel(o){if(['Recibido','Cancelada'].includes(o.status))return'none';const dd=daysDiff(o.estimated);if(dd===null)return'none';if(dd<0)return'red';if(dd<=3)return'yellow';return'green';}
+function alertBadge(o){const lv=alertLevel(o);if(lv==='red')return`<span class="badge b-red"><span class="badge-dot"></span>Atrasada</span>`;if(lv==='yellow')return`<span class="badge b-yellow"><span class="badge-dot"></span>Vence pronto</span>`;if(o.critical)return`<span class="badge b-orange"><span class="badge-dot"></span>Crítico</span>`;const r=daysDiff(o.estimated);if(o.status==='Recibido')return`<span class="badge b-green"><span class="badge-dot"></span>Recibida</span>`;return r===0?`<span class="badge b-teal"><span class="badge-dot"></span>Llega hoy</span>`:`<span class="badge b-gray">—</span>`;}
+const statusBadge={'Esperando cotización':'b-gray','Por pagar':'b-orange','Pagado':'b-purple','Esperando entrega':'b-blue','Retirar':'b-yellow','Recibido':'b-green','Cancelada':'b-red'};
+function stBadge(s){const c=statusBadge[s]||'b-gray';return`<span class="badge ${c}"><span class="badge-dot"></span>${s}</span>`;}
+function prioBadge(p){return p==='Alta'?`<span class="prio-high">${p}</span>`:p==='Media'?`<span class="prio-med">${p}</span>`:`<span class="prio-low">${p}</span>`;}
+function fmtDate(s){if(!s)return'—';const p=s.split('-');return`${p[2]}/${p[1]}/${p[0]}`;}
+function rowClass(o){const lv=alertLevel(o);return lv==='red'?'row-alert-red':lv==='yellow'?'row-alert-yellow':'';}
+
+// ═══════════════════════════════════════════════════════════
+//  VISTAS
+// ═══════════════════════════════════════════════════════════
+function showView(v){
+  ['dashboard','orders','suppliers'].forEach(x=>{document.getElementById('view-'+x).style.display=x===v?'block':'none';document.getElementById('nav-'+x).classList.toggle('active',x===v);});
+  const titles={dashboard:'Dashboard',orders:'Órdenes de compra',suppliers:'Proveedores'};
+  document.getElementById('topbar-title').textContent=titles[v];
+  document.getElementById('btn-retiro').style.display=(v==='orders'&&currentRole==='gestor')?'inline-flex':'none';
+  if(v==='dashboard')renderDashboard();
+  if(v==='orders')renderOrdersTable();
+  if(v==='suppliers')renderSuppliers();
+}
+
+function setRole(r){
+  currentRole=r;
+  document.getElementById('rb-gestor').classList.toggle('active',r==='gestor');
+  document.getElementById('rb-jefe').classList.toggle('active',r==='jefe');
+  document.getElementById('btn-new-order').style.display=r==='gestor'?'inline-flex':'none';
+  document.getElementById('role-name').textContent=r==='gestor'?'Gestor de Compras':'Jefe de Planta';
+  document.getElementById('role-label').textContent=r==='gestor'?'Acceso completo':'Solo lectura';
+  document.getElementById('role-dot').style.background=r==='gestor'?'#00A3E0':'#34D399';
+  document.getElementById('readonly-tip').classList.toggle('show',r==='jefe');
+  const curView=['dashboard','orders','suppliers'].find(x=>document.getElementById('view-'+x).style.display!=='none')||'dashboard';
+  document.getElementById('btn-retiro').style.display=(curView==='orders'&&r==='gestor')?'inline-flex':'none';
+  renderOrdersTable();renderDashboard();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════
+function renderDashboard(){
+  const open=orders.filter(o=>!['Recibido','Cancelada'].includes(o.status));
+  const late=orders.filter(o=>alertLevel(o)==='red');
+  const tod=orders.filter(o=>daysDiff(o.estimated)===0&&!['Recibido','Cancelada'].includes(o.status));
+  const wk=orders.filter(o=>{const d=daysDiff(o.estimated);return d!==null&&d>0&&d<=7&&!['Recibido','Cancelada'].includes(o.status);});
+  document.getElementById('s-open').textContent=open.length;
+  document.getElementById('s-late').textContent=late.length;
+  document.getElementById('s-today').textContent=tod.length;
+  document.getElementById('s-week').textContent=wk.length;
+  const lateC=orders.filter(o=>o.critical&&alertLevel(o)==='red');
+  const banner=document.getElementById('alert-banner');
+  if(lateC.length>0){banner.style.display='flex';document.getElementById('alert-text').textContent=`${lateC.length} material(es) crítico(s) con atraso: ${lateC.map(o=>o.desc).join(', ')}`;}
+  else banner.style.display='none';
+  const upcoming=[...tod,...wk,...orders.filter(o=>alertLevel(o)==='red')].filter((v,i,a)=>a.indexOf(v)===i);
+  const tb=document.getElementById('tb-upcoming');
+  if(upcoming.length===0)tb.innerHTML=`<tr><td colspan="7" class="empty"><i class="ti ti-circle-check"></i>Sin entregas en los próximos 7 días</td></tr>`;
+  else tb.innerHTML=upcoming.map(o=>`<tr class="${rowClass(o)}" onclick="openPanel(${o.id})"><td class="td-primary">${o.supplier}</td><td>${o.desc}</td><td>${o.qty} ${o.unit}</td><td>${fmtDate(o.estimated)}</td><td>${stBadge(o.status)}</td><td>${prioBadge(o.priority)}</td><td>${alertBadge(o)}</td></tr>`).join('');
+  renderCharts();
+}
+
+function renderCharts(){
+  const sc={},pc={};
+  orders.forEach(o=>{sc[o.status]=(sc[o.status]||0)+1;pc[o.supplier]=(pc[o.supplier]||0)+1;});
+  const palette=['#0057A8','#16A34A','#D97706','#DC2626','#7C3AED','#C2410C','#0F766E','#00A3E0'];
+  const grid='#E2EAF2',tick='#5A7A9A';
+  const base={responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:tick,font:{size:11},boxWidth:10,padding:8}},tooltip:{backgroundColor:'#fff',borderColor:'#D6E4F0',borderWidth:1,titleColor:'#1A2B40',bodyColor:'#5A7A9A'}}};
+  if(chartEstado)chartEstado.destroy();
+  chartEstado=new Chart(document.getElementById('chartEstado'),{type:'doughnut',data:{labels:Object.keys(sc),datasets:[{data:Object.values(sc),backgroundColor:palette,borderWidth:2,borderColor:'#fff',hoverOffset:4}]},options:{...base,cutout:'62%'}});
+  if(chartProv)chartProv.destroy();
+  chartProv=new Chart(document.getElementById('chartProv'),{type:'bar',data:{labels:Object.keys(pc),datasets:[{data:Object.values(pc),backgroundColor:'#0057A8',borderRadius:5,borderSkipped:false}]},options:{...base,indexAxis:'y',plugins:{...base.plugins,legend:{display:false}},scales:{x:{ticks:{color:tick,font:{size:11},stepSize:1},grid:{color:grid},border:{color:grid}},y:{ticks:{color:tick,font:{size:11}},grid:{display:false},border:{color:'transparent'}}}}});
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ÓRDENES
+// ═══════════════════════════════════════════════════════════
+function applyFilters(){
+  const p=document.getElementById('f-prov').value.toLowerCase();
+  const pr=document.getElementById('f-prod').value.toLowerCase();
+  const st=document.getElementById('f-estado').value;
+  const pri=document.getElementById('f-prio').value;
+  const fd=document.getElementById('f-fecha').value;
+  filteredOrders=orders.filter(o=>{
+    if(p&&!o.supplier.toLowerCase().includes(p))return false;
+    if(pr&&!o.desc.toLowerCase().includes(pr))return false;
+    if(st&&o.status!==st)return false;
+    if(pri&&o.priority!==pri)return false;
+    if(fd&&o.estimated!==fd)return false;
+    return true;
+  });
+  renderOrdersTable();
+}
+function clearFilters(){['f-prov','f-prod','f-fecha'].forEach(id=>document.getElementById(id).value='');['f-estado','f-prio'].forEach(id=>document.getElementById(id).value='');filteredOrders=[...orders];renderOrdersTable();}
+
+function renderOrdersTable(){
+  const tb=document.getElementById('tb-orders');
+  const editable=currentRole==='gestor';
+  if(filteredOrders.length===0){tb.innerHTML=`<tr><td colspan="10" class="empty"><i class="ti ti-package-off"></i>${orders.length===0?'Todavía no cargaste ninguna orden.':'Sin resultados para los filtros aplicados.'}</td></tr>`;return;}
+  tb.innerHTML=filteredOrders.map(o=>`<tr class="${rowClass(o)}" onclick="openPanel(${o.id})"><td class="td-primary">${o.supplier}</td><td>${o.desc}</td><td>${o.qty} ${o.unit}</td><td>${fmtDate(o.issueDate)}</td><td>${fmtDate(o.promised)}</td><td>${fmtDate(o.estimated)}</td><td>${stBadge(o.status)}</td><td>${prioBadge(o.priority)}</td><td>${alertBadge(o)}</td><td>${editable?`<button class="btn btn-ghost" style="padding:4px 8px;font-size:12px;box-shadow:none" onclick="event.stopPropagation();openModal(${o.id})"><i class="ti ti-edit"></i></button>`:''}</td></tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PROVEEDORES
+// ═══════════════════════════════════════════════════════════
+function renderSuppliers(){
+  const isGestor=currentRole==='gestor';
+  document.getElementById('prov-grid').innerHTML=CATALOG.map(p=>`<div class="prov-card">
+    <div class="prov-card-header"><div><div class="prov-card-name">${p.name}</div><div class="prov-card-prods">${p.products.length} producto(s)</div></div>${isGestor?`<button class="prov-edit-btn" onclick="openProvModal('${p.name.replace(/'/g,"\\'")}')"><i class="ti ti-edit" style="font-size:13px"></i> Editar</button>`:''}</div>
+    <div class="prov-info-row"><i class="ti ti-map-pin"></i><span class="${p.address?'prov-info-val':'prov-info-empty'}">${p.address||'Sin dirección cargada'}</span></div>
+    <div class="prov-info-row"><i class="ti ti-clock"></i><span class="${p.hours?'prov-info-val':'prov-info-empty'}">${p.hours||'Sin horario cargado'}</span></div>
+    ${p.contact?`<div class="prov-info-row"><i class="ti ti-phone"></i><span class="prov-info-val">${p.contact}</span></div>`:''}
+    ${p.obs?`<div class="prov-info-row"><i class="ti ti-notes"></i><span class="prov-info-val">${p.obs}</span></div>`:''}
+  </div>`).join('');
+}
+
+function openProvModal(name){
+  editingProvName=name;
+  const p=CATALOG.find(x=>x.name===name);if(!p)return;
+  document.getElementById('pm-name').value=p.name;
+  document.getElementById('pm-address').value=p.address||'';
+  document.getElementById('pm-hours').value=p.hours||'';
+  document.getElementById('pm-contact').value=p.contact||'';
+  document.getElementById('pm-obs').value=p.obs||'';
+  document.getElementById('prov-modal-overlay').classList.add('open');
+}
+function closeProvModal(){document.getElementById('prov-modal-overlay').classList.remove('open');editingProvName=null;}
+function closeProvModalOutside(e){if(e.target===document.getElementById('prov-modal-overlay'))closeProvModal();}
+function saveProvData(){
+  if(!editingProvName)return;
+  const p=CATALOG.find(x=>x.name===editingProvName);if(!p)return;
+  p.address=document.getElementById('pm-address').value.trim();
+  p.hours=document.getElementById('pm-hours').value.trim();
+  p.contact=document.getElementById('pm-contact').value.trim();
+  p.obs=document.getElementById('pm-obs').value.trim();
+  closeProvModal();renderSuppliers();
+  localStorage.setItem('tecnon_suppliers', JSON.stringify(CATALOG.map(c=>({name:c.name,address:c.address,hours:c.hours,contact:c.contact,obs:c.obs}))));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DETALLE
+// ═══════════════════════════════════════════════════════════
+function openPanel(id){
+  const o=orders.find(x=>x.id===id);if(!o)return;
+  panelOrderId=id;
+  document.getElementById('dp-title').textContent=o.desc;
+  document.getElementById('dp-code').textContent=o.supplier;
+  document.getElementById('dp-edit-btn').style.display=currentRole==='gestor'?'inline-flex':'none';
+  let html=`<div class="detail-section"><div class="detail-section-title">Estado y alerta</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${stBadge(o.status)} ${alertBadge(o)} ${prioBadge(o.priority)} ${o.critical?'<span class="badge b-orange"><span class="badge-dot"></span>Material crítico</span>':''}</div></div>
+  <div class="detail-section"><div class="detail-section-title">Datos del pedido</div>${dr('Proveedor',o.supplier)}${dr('Contacto',o.contact||'—')}${dr('Producto',o.desc)}${dr('Cantidad',`${o.qty} ${o.unit}`)}</div>
+  <div class="detail-section"><div class="detail-section-title">Fechas</div>${dr('Emisión',fmtDate(o.issueDate))}${dr('Prometida proveedor',fmtDate(o.promised))}${dr('Estimada llegada',fmtDate(o.estimated))}${dr('Recepción real',fmtDate(o.received))}</div>`;
+  const obs=[o.obsBuyer,o.obsDelay,o.obsProblem,o.obsProd].filter(Boolean);
+  if(obs.length){html+=`<div class="detail-section"><div class="detail-section-title">Observaciones</div>`;if(o.obsBuyer)html+=`<div class="obs-item"><span style="font-size:10px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">COMPRADOR</span>${o.obsBuyer}</div>`;if(o.obsDelay)html+=`<div class="obs-item" style="border-left-color:#D97706"><span style="font-size:10px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">ATRASO</span>${o.obsDelay}</div>`;if(o.obsProblem)html+=`<div class="obs-item" style="border-left-color:#DC2626"><span style="font-size:10px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">PROBLEMA</span>${o.obsProblem}</div>`;if(o.obsProd)html+=`<div class="obs-item" style="border-left-color:#16A34A"><span style="font-size:10px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:3px">PRODUCCIÓN</span>${o.obsProd}</div>`;html+=`</div>`;}
+  if(o.attachments&&o.attachments.length){html+=`<div class="detail-section"><div class="detail-section-title">Archivos adjuntos</div>`;html+=o.attachments.map(a=>`<div class="attach-item"><i class="ti ${a.type==='IMG'?'ti-photo':'ti-file-description'} attach-icon"></i><span class="attach-name">${a.name}</span><span class="attach-type">${a.type}</span></div>`).join('');html+=`</div>`;}
+  document.getElementById('dp-content').innerHTML=html;
+  document.getElementById('detail-panel').classList.add('open');
+}
+function dr(k,v){return`<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val">${v}</span></div>`;}
+function closePanel(){document.getElementById('detail-panel').classList.remove('open');}
+function editFromPanel(){if(panelOrderId){closePanel();openModal(panelOrderId);}}
+
+// ═══════════════════════════════════════════════════════════
+//  MODAL ORDEN
+// ═══════════════════════════════════════════════════════════
+function populateSupplierSelect(){
+  const sel=document.getElementById('f-supplier');
+  sel.innerHTML='<option value="">Seleccionar proveedor...</option>'+CATALOG.map(p=>`<option value="${p.name.replace(/"/g,'&quot;')}">${p.name}</option>`).join('');
+}
+function onSupplierChange(){
+  const supName=document.getElementById('f-supplier').value;
+  const prodSel=document.getElementById('f-product');
+  const hint=document.getElementById('product-hint');
+  const sup=CATALOG.find(p=>p.name===supName);
+  if(!sup){prodSel.innerHTML='<option value="">Primero elegí un proveedor...</option>';prodSel.disabled=true;hint.textContent='';return;}
+  prodSel.disabled=false;
+  prodSel.innerHTML='<option value="">Seleccionar producto...</option>'+sup.products.map(pr=>`<option value="${pr.desc.replace(/"/g,'&quot;')}">${pr.desc}</option>`).join('');
+  hint.textContent=`${sup.products.length} producto(s) de ${sup.name}`;
+}
+function addAttach(name,type){if(!tempAttachments.find(a=>a.name===name)){tempAttachments.push({name,type});renderAttachPreview();}}
+function renderAttachPreview(){document.getElementById('attach-preview').innerHTML=tempAttachments.map(a=>`<div class="attach-item" style="cursor:default"><i class="ti ${a.type==='IMG'?'ti-photo':'ti-file-description'} attach-icon"></i><span class="attach-name">${a.name}</span><span class="attach-type">${a.type}</span></div>`).join('');}
+
+function openModal(id=null){
+  if(currentRole!=='gestor')return;
+  editingId=id;tempAttachments=[];
+  document.getElementById('attach-preview').innerHTML='';
+  document.getElementById('modal-title').textContent=id?'Editar orden de compra':'Nueva orden de compra';
+  document.getElementById('btn-delete').style.display=id?'inline-flex':'none';
+  populateSupplierSelect();
+  ['f-contact','f-obs-delay','f-obs-problem'].forEach(x=>document.getElementById(x).value='');
+  ['f-obs-buyer','f-obs-prod'].forEach(x=>document.getElementById(x).value='');
+  ['f-promised','f-estimated','f-received'].forEach(x=>document.getElementById(x).value='');
+  document.getElementById('f-issue-date').value=fmt(today);
+  document.getElementById('f-priority').value='Media';
+  document.getElementById('f-product').innerHTML='<option value="">Primero elegí un proveedor...</option>';
+  document.getElementById('f-product').disabled=true;
+  document.getElementById('product-hint').textContent='';
+  document.getElementById('f-qty').value='';
+  document.getElementById('f-unit').value='unidades';
+  document.getElementById('f-status').value='Esperando cotización';
+  document.getElementById('f-critical').value='0';
+  if(id){
+    const o=orders.find(x=>x.id===id);
+    if(o){
+      document.getElementById('f-supplier').value=o.supplier;onSupplierChange();
+      document.getElementById('f-product').value=o.desc;
+      document.getElementById('f-contact').value=o.contact||'';
+      document.getElementById('f-issue-date').value=o.issueDate;
+      document.getElementById('f-priority').value=o.priority;
+      document.getElementById('f-qty').value=o.qty;
+      document.getElementById('f-unit').value=o.unit;
+      document.getElementById('f-status').value=o.status;
+      document.getElementById('f-promised').value=o.promised||'';
+      document.getElementById('f-estimated').value=o.estimated||'';
+      document.getElementById('f-received').value=o.received||'';
+      document.getElementById('f-critical').value=o.critical?'1':'0';
+      document.getElementById('f-obs-buyer').value=o.obsBuyer||'';
+      document.getElementById('f-obs-delay').value=o.obsDelay||'';
+      document.getElementById('f-obs-problem').value=o.obsProblem||'';
+      document.getElementById('f-obs-prod').value=o.obsProd||'';
+      tempAttachments=[...(o.attachments||[])];renderAttachPreview();
+    }
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');editingId=null;}
+function closeModalOutside(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
+
+async function saveOrder(){
+  const sup=document.getElementById('f-supplier').value;
+  const des=document.getElementById('f-product').value;
+  const qty=document.getElementById('f-qty').value.trim();
+  if(!sup||!des||!qty){alert('Completá los campos obligatorios marcados con *');return;}
+  const data={
+    supplier:sup,contact:document.getElementById('f-contact').value.trim(),
+    issueDate:document.getElementById('f-issue-date').value,
+    priority:document.getElementById('f-priority').value,
+    desc:des,qty:+qty,unit:document.getElementById('f-unit').value,
+    status:document.getElementById('f-status').value,
+    promised:document.getElementById('f-promised').value,
+    estimated:document.getElementById('f-estimated').value,
+    received:document.getElementById('f-received').value,
+    critical:document.getElementById('f-critical').value==='1',
+    obsBuyer:document.getElementById('f-obs-buyer').value.trim(),
+    obsDelay:document.getElementById('f-obs-delay').value.trim(),
+    obsProblem:document.getElementById('f-obs-problem').value.trim(),
+    obsProd:document.getElementById('f-obs-prod').value.trim(),
+    attachments:[...tempAttachments]
+  };
+  if(editingId){
+    const idx=orders.findIndex(x=>x.id===editingId);
+    if(idx>=0){data.id=editingId;orders[idx]={...orders[idx],...data};}
+  } else {
+    data.id=Date.now();orders.push(data);
+  }
+  filteredOrders=[...orders];
+  closeModal();renderDashboard();renderOrdersTable();
+  debounceSave(()=>saveToSheets('saveOrders',{orders}));
+}
+
+async function deleteOrder(){
+  if(!editingId)return;
+  if(!confirm('¿Eliminar esta orden? No se puede deshacer.'))return;
+  orders=orders.filter(x=>x.id!==editingId);
+  filteredOrders=[...orders];
+  closeModal();closePanel();
+  renderDashboard();renderOrdersTable();
+  debounceSave(()=>saveToSheets('saveOrders',{orders}));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RETIROS
+// ═══════════════════════════════════════════════════════════
+function openRetiroPanel(){
+  const active=orders.filter(o=>!['Recibido','Cancelada'].includes(o.status));
+  const byProv={};active.forEach(o=>{if(!byProv[o.supplier])byProv[o.supplier]=[];byProv[o.supplier].push(o);});
+  if(Object.keys(byProv).length===0){
+    document.getElementById('retiro-empty').style.display='block';
+    document.getElementById('retiro-text').style.display='none';
+  } else {
+    document.getElementById('retiro-empty').style.display='none';
+    document.getElementById('retiro-text').style.display='block';
+    const d=new Date();
+    const dateStr=`${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+    let txt=`📦 LISTA DE RETIROS — TECNON SRL\n${dateStr}\n${'─'.repeat(36)}\n\n`;
+    Object.keys(byProv).sort().forEach(supName=>{
+      const pData=CATALOG.find(x=>x.name===supName)||{};
+      txt+=`🏭 ${supName}\n`;
+      if(pData.address)txt+=`📍 ${pData.address}\n`;
+      if(pData.hours)txt+=`🕐 ${pData.hours}\n`;
+      if(pData.contact)txt+=`📞 ${pData.contact}\n`;
+      txt+=`\nProductos a retirar:\n`;
+      byProv[supName].forEach(o=>{
+        const prio=o.priority==='Alta'?'⚠️ ':o.priority==='Media'?'➡️ ':'✅ ';
+        txt+=`  ${prio}${o.desc} — ${o.qty} ${o.unit}  [${o.status}]\n`;
+      });
+      txt+=`\n`;
+    });
+    txt+=`${'─'.repeat(36)}\nProveedores: ${Object.keys(byProv).length}  |  Ítems: ${active.length}`;
+    document.getElementById('retiro-text').textContent=txt;
+  }
+  document.getElementById('copy-ok').classList.remove('show');
+  document.getElementById('retiro-panel').classList.add('open');
+}
+function closeRetiroPanel(){document.getElementById('retiro-panel').classList.remove('open');}
+function copyRetiro(){
+  const txt=document.getElementById('retiro-text').textContent;if(!txt)return;
+  navigator.clipboard.writeText(txt).catch(()=>{const el=document.createElement('textarea');el.value=txt;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);});
+  const ok=document.getElementById('copy-ok');ok.classList.add('show');setTimeout(()=>ok.classList.remove('show'),3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INICIO
+// ═══════════════════════════════════════════════════════════
+async function init(){
+  setSyncStatus('saving','Iniciando...');
+  if(SCRIPT_URL){
+    document.getElementById('setup-banner').style.display='none';
+    document.getElementById('script-url-input').value=SCRIPT_URL;
+    await loadFromSheets();
+  } else {
+    // Sin script configurado: usar datos locales si existen
+    orders=JSON.parse(localStorage.getItem('tecnon_orders_local')||'[]');
+    filteredOrders=[...orders];
+    setSyncStatus('error','Sin configurar');
+    renderAll();
+  }
+  document.getElementById('loading-screen').style.display='none';
+}
+
+init();
+</script>
+</body>
+</html>
